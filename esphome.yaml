@@ -1,0 +1,159 @@
+esphome:
+  name: hitachi-aircon
+  friendly_name: Hitachi Aircon
+  name_add_mac_suffix: true
+
+esp32:
+  board: wemos_d1_mini32
+  framework:
+    type: esp-idf
+
+# Disable logging as UART is used to talk to the aircon
+logger:
+  baud_rate: 0
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret hitachi_aircon_api_secret
+
+ota:
+  password: !secret hitachi_aircon_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_psk
+  fast_connect: true
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Hitachi-Aircon Fallback Hotspot"
+    password: "s1ikdUMvdH4f"
+
+network:
+    enable_ipv6: true
+
+# Aircon
+# TODO: this is no longer correct
+# Pin assignments
+# CN7
+# Pin 2 -> GPIO16 - XXX - moved to RX
+# Pin 4 -> GPIO17
+# CN2
+# Pin 1 -> GPIO19
+# IC501
+# Pin 48 - GPIO21
+# Pin 49 - GPIO22
+
+# UARTs monitoring the compressor communications, for future reverse-engineering
+# service manual has details of the protocol
+uart:
+  - id: compressor_uart1
+    rx_pin:
+      number: GPIO21
+      mode:
+        input: true
+        pullup: false
+        pulldown: false
+
+    baud_rate: 300
+    debug:
+      direction: BOTH
+      dummy_receiver: true
+      after:
+        timeout: 100ms
+  - id: compressor_uart2
+    rx_pin:
+      number: GPIO22
+      mode:
+        input: true
+        pullup: false
+        pulldown: false
+
+    baud_rate: 300
+    debug:
+      direction: BOTH
+      dummy_receiver: true
+      after:
+        timeout: 100ms
+
+# receives IR codes from the official remote
+remote_receiver:
+  pin:
+    number: GPIO19
+    inverted: true
+    mode: INPUT_OUTPUT_OPEN_DRAIN
+  tolerance: 45%
+  id: ir_receiver
+  dump: pronto
+
+# transmits IR codes to control the aircon
+remote_transmitter:
+  carrier_duty_percent: 100%
+  pin:
+    number: GPIO19
+    inverted: true
+    mode: INPUT_OUTPUT_OPEN_DRAIN
+
+climate:
+  - platform: hitachi_ac344
+    name: "Air conditioner"
+    supports_heat: True
+    supports_cool: True
+    receiver_id: ir_receiver
+    sensor: ambient_temperature_sensor
+
+# this is only there so the aircon entity's ambient temp looks accurate
+# this has no effect on the actual device
+# TODO: I guess you can add an actual hardware temperature sensor for this?
+sensor:
+  - platform: template
+    id: ambient_temperature_sensor
+    update_interval: never
+
+number:
+  - platform: template
+    name: "Ambient temperature reference"
+    optimistic: true
+    min_value: -50
+    max_value: +50
+    step: 0.01
+    entity_category: config
+    unit_of_measurement: °C
+    device_class: temperature
+    on_value:
+      then:
+        - sensor.template.publish:
+            id: ambient_temperature_sensor
+            state: !lambda 'return x;'
+
+# controls the "HA" pins
+# TODO: add docs about this
+switch:
+  - platform: gpio
+    id: ha_pin
+    pin:
+      number: GPIO16
+      mode:
+        output: True
+      drive_strength: 5mA
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO17
+      mode:
+        input: true
+      inverted: True
+    name: "HA Operating status"
+    device_class: running
+    entity_category: diagnostic
+
+button:
+  - platform: template
+    name: "HA button"
+    on_press:
+      - switch.turn_on: ha_pin
+      - delay: 250ms
+      - switch.turn_off: ha_pin
+    entity_category: diagnostic

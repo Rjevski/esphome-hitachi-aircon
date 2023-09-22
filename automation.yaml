@@ -1,0 +1,14 @@
+alias: Notify aircon of current lounge temperature
+description: ""
+trigger:
+  - platform: state
+    entity_id:
+      - sensor.atc_a57e_temperature
+condition: []
+action:
+  - service: number.set_value
+    data:
+      value: "{{ trigger.to_state.state }}"
+    target:
+      entity_id: number.hitachi_aircon_5957c4_ambient_temperature_reference
+mode: single
