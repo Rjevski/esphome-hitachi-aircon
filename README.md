@@ -35,7 +35,7 @@ You could also add a real temperature sensor if you wish?
 
 ## Compressor serial bus snooping
 
-You'll notice that this config defines UARTs which snoop on both directions of the serial bus going to the compressor. The protocol is documented in the service manual so it can be decoded and read-only entities be created from the decoded values.
+You'll notice that this config defines UARTs which snoop on both directions of the serial bus going to the compressor. The protocol is documented in the service manual (see `service_manual_serial_frame_format.png`) so it can be decoded and read-only entities be created from the decoded values.
 
 # Known issues
 
